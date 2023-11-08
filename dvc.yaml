@@ -1,0 +1,51 @@
+# -n specifies a name for the stage.
+# -p defines special types of dependencie
+# -d defines dependencies on these files. Notice that the source code itself is marked as a dependency as well.
+# -o specifies an output directory for this script, which writes two files in it.
+
+stages:
+  prepare: # prepare raster data and high confidence polys
+    cmd: python src/prepare.py data/data.xml
+    deps:
+    - data/data.xml
+    - src/extract.py
+    params:
+    - prepare.seed
+    - prepare.split
+    outs:
+    - data/prepared
+
+  extract: # extract labeled and unlabeled pts
+    cmd: python src/extract.py data/interim/labeled_pts.shp
+    deps:
+    - data/data.xml
+    - src/extract.py
+    params:
+    - prepare.seed
+    - prepare.split
+    outs:
+    - data/prepared
+  
+  clean: # prepare data for modeling
+    cmd: python src/extract.py 
+    deps:
+    - data/data.xml
+    - src/extract.py
+    params:
+    - prepare.seed
+    - prepare.split
+    outs:
+    - data/prepared
+
+  tune: # performs gridsearch to identify hyperparameters 
+    cmd: python src/extract.py 
+    deps:
+    - data/data.xml
+    - src/extract.py
+    params:
+    - prepare.seed
+    - prepare.split
+    outs:
+    - data/prepared
+  
+  train: # trains the label propagation algorithm
