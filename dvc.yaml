@@ -4,16 +4,42 @@
 # -o specifies an output directory for this script, which writes two files in it.
 
 stages:
-  prepare: # prepare raster data and high confidence polys
-    cmd: python src/prepare.py data/data.xml
+  rasters: # prepare raster data 
+    cmd: python src/prepare_rasters.py 
     deps:
-    - data/data.xml
-    - src/extract.py
+    - src/prepare_rasters.py
+    - data/raw/costa_rica/
+    - data/interim/costa_rica/
     params:
-    - prepare.seed
-    - prepare.split
+    - prepare_rasters.country
+    - prepare_rasters.data
+    - prepare_rasters.lulc_tif
     outs:
-    - data/prepared
+    - data/interim/costa_rica/
+
+  polys: # prepare polygons (high confidence)
+    cmd: python src/prepare_polys.py 
+    deps:
+    - src/prepare_polys.py
+    - src/prepare_rasters.py
+    - data/raw/costa_rica/
+    - data/interim/costa_rica/
+    params:
+    - xx
+    outs:
+    - data/interim/costa_rica/
+  
+  points: # prepare labeled and unlabeled points
+    cmd: python src/prepare_points.py 
+    deps:
+    - src/prepare_points.py
+    - src/prepare_polys.py
+    - data/raw/costa_rica/
+    - data/interim/costa_rica/
+    params:
+    - xx
+    outs:
+    - data/interim/costa_rica/
 
   extract: # extract labeled and unlabeled pts
     cmd: python src/extract.py data/interim/labeled_pts.shp
