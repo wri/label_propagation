@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# import click
-# import logging
-# from pathlib import Path
-# from dotenv import find_dotenv, load_dotenv
-
 import os
 import rasterio as rs
 from rasterio.mask import mask
@@ -108,6 +102,12 @@ def reprj_lulc_raster(lulc_tif, dst_crs='EPSG:4326'):
 
 
 
+
+# -*- coding: utf-8 -*-
+# import click
+# import logging
+# from pathlib import Path
+# from dotenv import find_dotenv, load_dotenv
 
 
 # @click.command()

@@ -3,8 +3,9 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 from shapely.geometry import Point
+import rasterio as rs
 
-def get_unlabeled_pts(country, high_conf, num_pts):
+def get_unlabeled_pts(country, num_pts): # add high_conf param when import is removed
     
     '''
     Points must fall within the country bounds but outside of
@@ -44,13 +45,17 @@ def get_unlabeled_pts(country, high_conf, num_pts):
     
     return gdf
 
-def get_labeled_pts():
+
+def get_labeled_pts(country):
     '''
     this will extract centroids from high confidence polygons
     '''
+    interim = (f'../data/interim/{country}/')
+    pts = gpd.read_file(f'{interim}labeled_pts.shp')
+    return pts
 
 
-# this might not live here TBD
+# this might not live here 
 def extract_features(pts):
     
     '''
@@ -112,3 +117,6 @@ def eval_centroids(centroid_pts):
     print(f'{len(no_sentinel)+len(no_data)} samples will be dropped.')
     
     return df[['geometry', 'label']]
+
+
+    
