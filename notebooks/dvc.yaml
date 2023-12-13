@@ -1,4 +1,8 @@
 params:
 - dvclive/params.yaml
+artifacts:
+  lgr:
+    path: ../models/lgr.pkl
+    type: model
 metrics:
--dvclive/metrics.json
+- dvclive/metrics.json

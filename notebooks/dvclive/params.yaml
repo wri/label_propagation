@@ -1,21 +1,4 @@
-
-data:
-  labeled_csv: '../data/final/labeled.csv'
-  unlabeled_csv: '../data/final/unlabeled.csv'
-  test_size: 0.2
-  x_train_path: '../data/final/X_train.csv'
-  x_test_path: '../data/final/X_test.csv'
-  y_train_path: '../data/final/y_train.csv'
-  y_test_path: '../data/final/y_test.csv'
-
-train:
-  estimator_name: lgr
-  model_dir: '../models'
-  cv: 3
-  solver: lbfgs
-  max_iter: 100
-  multi_class: multinomial
-  random_state: 22
-
-reports:
-  # where metrics and visuals will be stored
+solver: lbfgs
+max_iter: 200
+multi_class: multinomial
+random_state: 22

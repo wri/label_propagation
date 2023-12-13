@@ -66,7 +66,7 @@ def convert_centroid_to_grid(centroid_df, country, labels, radius = 65):
 
     # update label for grid points falling outside high conf polygons
     if labels:
-        high_conf = gpd.read_file(f'../data/interim/{country}/HighConf_poly1.shp')
+        high_conf = gpd.read_file(f'../data/interim/{country}/hc_poly_v2.shp')
         start_labels = output_gdf.label.value_counts().reset_index()
         inside = gpd.sjoin(output_gdf, high_conf, how='inner') # identifies grid pts within high conf poly
         keys = ['point_x', 'point_y']
@@ -78,7 +78,7 @@ def convert_centroid_to_grid(centroid_df, country, labels, radius = 65):
         end_labels = output_gdf.label.value_counts().reset_index()
         print('The following label counts were updated to null:')
         print(start_labels['count'] - end_labels['count'])
-        output_gdf.to_file(f'../data/interim/{country}/labeled_grid.shp')
+        output_gdf.to_file(f'../data/interim/{country}/labeled_grid_v2.shp')
 
     else:
         output_gdf.to_file(f'../data/interim/{country}/unlabeled_grid.shp')    
