@@ -22,19 +22,15 @@ from scipy import ndimage
 param_path = 'params.yaml'
 
 
-def preprocess_datasets(param_path):
+def confirm_inputs_match(param_path):
     """
-    Preprocess all datasets in the folder to match the properties of the reference dataset,
-    including coordinate system and size (width and height).
-    Skips preprocessing if the dataset has already been processed.
+    this func should simply confirm that 
+    the crs and bounds of the SDPT and LULC datasets match
+    that of the TTC data -- functions in prepare_rasters
 
     :param dataFolder: Base folder containing the datasets
     :return: None
     """
-    # this func should simply confirm that 
-    # the crs and bounds of the SDPT and LULC datasets match
-    # that of the TTC data -- functions in prepare_rasters
-    print('na')
     return None
 
 def reclassify_by_value(array, values_to_reclassify):
