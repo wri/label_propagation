@@ -5,6 +5,29 @@ import pandas as pd
 from shapely.geometry import Point
 import rasterio as rs
 
+
+def get_labeled_pts(input_shape):
+    '''
+    Imports given shapefile to extract len(shapefile) centroids from high confidence
+    polygons to use as the labeled data.
+
+    Original Version
+    polygon: '../data/interim/costa_rica/interim/v1/hc_poly_v1.shp'
+    centroids: '../data/interim/costa_rica/interim/v1/labeled_pts.shp'
+    
+    New Version
+    polygon: '../data/interim/costa_rica/interim/v2/hc_poly_v1.shp'
+    centroids: '../data/interim/costa_rica/interim/v2'
+    '''
+    hc_poly = gpd.read_file(input_shape)
+    df = pd.DataFrame(columns=['geometry'])
+    df['geometry'] = hc_poly['geometry'].representative_point()
+    df['label'] = hc_poly['label']
+    centroids = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+
+    return centroids
+
+
 def get_unlabeled_pts(country, num_pts): # add high_conf param when import is removed
     
     '''
@@ -44,15 +67,6 @@ def get_unlabeled_pts(country, num_pts): # add high_conf param when import is re
     print(f'Completed in: {end - start}')
     
     return gdf
-
-
-def get_labeled_pts(country):
-    '''
-    this will extract centroids from high confidence polygons
-    '''
-    interim = (f'../data/interim/{country}/')
-    pts = gpd.read_file(f'{interim}labeled_pts.shp')
-    return pts
 
 
 # this might not live here 

@@ -7,7 +7,7 @@ import rasterio
 from rasterio.features import shapes
 import geopandas as gpd
 import numpy as np
-from scipy.ndimage import label, sum as ndi_sum
+from scipy.ndimage import label, sum as ndi_sum, minimum_filter, generate_binary_structure
 import subprocess
 import yaml
 import argparse
@@ -19,7 +19,6 @@ from scipy import ndimage
 # CREDIT: Erin Glen https://github.com/erin-glen
 # Setting up the local workspace... only user input needed is home plantation directory
 # workspace = "C:\GIS\Data\Plantation"  # this is the only user input needed
-param_path = 'params.yaml'
 
 
 def confirm_inputs_match(param_path):
@@ -28,8 +27,6 @@ def confirm_inputs_match(param_path):
     the crs and bounds of the SDPT and LULC datasets match
     that of the TTC data -- functions in prepare_rasters
 
-    :param dataFolder: Base folder containing the datasets
-    :return: None
     """
     return None
 
@@ -57,10 +54,11 @@ def reclassify_above_threshold(array, threshold):
     :param threshold: the minimum value threshold
     :return: a binary array
     """
-    array = np.where(array > threshold, 1, 0)
+    # array = np.where(array > threshold, 1, 0)
 
-    # array[array > threshold] = 1
-    # array[array <= threshold] = 0
+    array[array < threshold] = 0
+    array[array >= threshold] = 1
+
 
     return array
 
@@ -75,10 +73,10 @@ def reclassify_below_threshold(array, threshold):
     :param threshold: the maximum value threshold
     :return: a binary array
     """
-    array = np.where(array < threshold, 1, 0)
+    # array = np.where(array < threshold, 1, 0)
 
-    # array[array < threshold] = 1
-    # array[array >= threshold] = 0
+    array[array > threshold] = 0
+    array[array <= threshold] = 1
     
     return array
 
@@ -100,8 +98,6 @@ def multiply_arrays(array_list):
     for array in array_list[1:]:
         result = np.multiply(result, array)
     return result
-
-
 
 
 def classifyRasters(lulc_path, sdpt_path, ttc_path, params_path, category):
@@ -182,6 +178,8 @@ def classifyRasters(lulc_path, sdpt_path, ttc_path, params_path, category):
         dst.write(intersection.astype('uint8'), 1)
 
 
+
+
 def rastertoPoly(min_size, category):
     """
     Convert raster files to polygons, only including areas with a 
@@ -199,19 +197,16 @@ def rastertoPoly(min_size, category):
         image = src.read(1)  # read the first band
         crs = src.crs  # get the CRS from the raster
 
-        # Define 4-connectivity structure
-        structure = np.array([[0, 1, 0],
-                            [1, 1, 1],
-                            [0, 1, 0]], dtype=int)
-
-
         # Label connected components
-        labeled, _ = label(image, structure=structure)
-        sizes = ndi_sum(image, labeled, range(labeled.max() + 1))
-        mask = np.isin(labeled, np.where(sizes > min_size)[0])
+        structure = generate_binary_structure(2, 2)
+        labeled, _ = label(image, structure=structure) # label connected components in the raster.
+        sizes = ndi_sum(image, labeled, range(labeled.max() + 1)) #calculate the size of the components
+        mask = np.isin(labeled, np.where(sizes > min_size)[0]) # create a mask to filter out components less than min size
 
         filtered_image = image * mask
 
+        # create a sequence of dictionaries, each containing properties (raster value) 
+        # and geometry (shape) for the non-zero pixels in the filtered image.
         results = (
             {'properties': {'raster_val': v}, 'geometry': s}
             for i, (s, v) in enumerate(shapes(filtered_image,
@@ -227,8 +222,7 @@ def rastertoPoly(min_size, category):
     
     return None
 
-
-def createCentroidAndMergedPolygons(min_size, inputParams):
+def merge_hc_polys(min_size, inputParams):
     """
     This function processes all shapefiles in a specified folder. It creates two shapefiles:
     one with centroids of all polygons from all shapefiles and another with all polygons merged.
@@ -242,66 +236,43 @@ def createCentroidAndMergedPolygons(min_size, inputParams):
     input_folder =  '../data/Output/Intermediate/Poly/'
     output_folder = '../data/Output/Final/'
 
-    all_centroids = []
     all_polygons = []
     shapefile_data = []
-    label_map = inputParams.set_index('Category')['label']
 
     categories = inputParams['Category'].unique().tolist()
+    label_map = inputParams.set_index('Category')['label']
 
-    for category in categories[:2]:
-        print(f"Extracting centroids for {category}")
+    # gather data on specific category for output csv
+    for category in categories:
         gdf = gpd.read_file(f"{input_folder + category}.shp")
+        # add column for labels
+        gdf['category'] = category
+        gdf['label'] = gdf['category'].map(label_map)
+        all_polygons.append(gdf)
+        num_polygons = len(gdf)
 
         # Transform to a projected CRS for area calculation
-        gdf_projected = gdf.to_crs('EPSG:3857')
-
-        # Process centroids
-        centroids = gdf_projected['geometry'].representative_point()
-
-        # Transform centroids back to the original CRS
-        centroids = centroids.to_crs(gdf.crs)
-
-        centroids_gdf = gpd.GeoDataFrame(geometry=centroids, crs=gdf.crs)
-        centroids_gdf['Category'] = category
-        centroids_gdf['label_value'] = centroids_gdf['Category'].map(label_map)
-
-        all_centroids.append(centroids_gdf)
-
-        # Accumulate polygons
-        all_polygons.append(gdf)
-
-        # Count polygons and centroids
-        num_polygons = len(gdf)
-        num_centroids = len(centroids)
-
         # Calculate average size and variance in hectares
+        gdf_projected = gdf.to_crs('EPSG:3857')
         areas_hectares = gdf_projected['geometry'].area / 10000  # Convert from square meters to hectares
         avg_size_hectares = areas_hectares.mean()
         variance_hectares = areas_hectares.var()
-
-        shapefile_data.append([category, num_polygons, num_centroids, min_size, avg_size_hectares, variance_hectares])
-
-    # Merge centroids into a single GeoDataFrame and save
-    final_centroids = gpd.GeoDataFrame(pd.concat(all_centroids, ignore_index=True), crs=gdf.crs)
-    output_shapefile_centroids = os.path.join(output_folder, "all_centroids.shp")
-    final_centroids.to_file(output_shapefile_centroids)
-    print(f"\nAll centroids have been saved to {output_shapefile_centroids}")
+        shapefile_data.append([category, num_polygons, min_size, avg_size_hectares, variance_hectares])
 
     # Merge polygons into a single GeoDataFrame
     merged_polygons = gpd.GeoDataFrame(pd.concat(all_polygons, ignore_index=True), crs=gdf.crs)
-    output_shapefile_polygons = os.path.join(output_folder, "merged_polygons.shp")
-    merged_polygons.to_file(output_shapefile_polygons)
-    print(f"All polygons have been merged and saved to {output_shapefile_polygons}")
+    output_file = os.path.join(output_folder, "merged_polygons.shp")
+    merged_polygons.to_file(output_file)
+    print(f"All polygons have been merged and saved to {output_file}")
 
     # Save shapefile data to CSV
-    columns = ["Land Cover", "Number of Polygons", "Number of Centroids", "Min Size", "Average Size (Hectares)", "Variance in Size (Hectares)"]
+    columns = ["Land Cover", "Number of Polygons", "Min Size", "Average Size (Hectares)", "Variance in Size (Hectares)"]
     df = pd.DataFrame(shapefile_data, columns=columns)
-    output_csv = os.path.join(output_folder, "stats_jessica2.csv")
+    output_csv = os.path.join(output_folder, "stats_jessica4.csv")
     df.to_csv(output_csv, index=False)
-    print(f"Statistics saved to {output_csv}\n")
+    print(f"Statistics saved to {output_csv}")
 
-    pprint.pprint(df)
+    return None
 
 
 def create_highconf_polygons(params_path,
@@ -334,7 +305,7 @@ def create_highconf_polygons(params_path,
     input_params = pd.read_csv(params_path)
     categories = input_params['Category'].unique().tolist()
     
-    for category in categories[:2]:
+    for category in categories:
         print("Creating a binary raster of high confidence areas for", category,)
         classifyRasters(lulc_path, 
                         sdpt_path, 
@@ -343,12 +314,11 @@ def create_highconf_polygons(params_path,
                         category
                         )
     
-    for category in categories[:2]:
-        print(f"\n Converting {category} high confidence rasters to polygons...")
+        print(f"Converting {category} high confidence raster to polygon...")
         rastertoPoly(min_size, category)
 
-    print("\n Extracting centroids and merging polygons...")
-    createCentroidAndMergedPolygons(min_size, input_params)
+    print("Merging all high conf polygons...")
+    merge_hc_polys(min_size, input_params)
 
     return None
 
