@@ -162,12 +162,12 @@ def classifyRasters(lulc_path, sdpt_path, ttc_path, params_path, category):
                 assert binary_array.any(), f"Error: Array is empty."
                 binary_list.append(binary_array)
     
-    for index, array in enumerate(binary_list):
-        print(f"Array {index} shape: {array.shape}")
+    # for index, array in enumerate(binary_list):
+    #     print(f"Array {index} shape: {array.shape}")
 
     intersection = multiply_arrays(binary_list)
     allzeros = intersection.any()
-    assert allzeros, "Error: Intersection array is empty.\n"
+    assert allzeros, "Error: Intersection array is empty."
 
     output_raster_file = os.path.join('../data/Output/Intermediate/Rasters/', str(category) + ".tif")
     ttc = rasterio.open(ttc_path)
@@ -198,7 +198,12 @@ def rastertoPoly(min_size, category):
         crs = src.crs  # get the CRS from the raster
 
         # Label connected components
-        structure = generate_binary_structure(2, 2)
+        if category == 'Agro_Coffee':
+            structure = generate_binary_structure(2, 2)
+        else:
+            structure = np.array([[0, 1, 0],
+                                  [1, 1, 1],
+                                  [0, 1, 0]], dtype=int)
         labeled, _ = label(image, structure=structure) # label connected components in the raster.
         sizes = ndi_sum(image, labeled, range(labeled.max() + 1)) #calculate the size of the components
         mask = np.isin(labeled, np.where(sizes > min_size)[0]) # create a mask to filter out components less than min size
@@ -261,14 +266,14 @@ def merge_hc_polys(min_size, inputParams):
 
     # Merge polygons into a single GeoDataFrame
     merged_polygons = gpd.GeoDataFrame(pd.concat(all_polygons, ignore_index=True), crs=gdf.crs)
-    output_file = os.path.join(output_folder, "merged_polygons.shp")
+    output_file = os.path.join(output_folder, "merged_polygons2.shp")
     merged_polygons.to_file(output_file)
     print(f"All polygons have been merged and saved to {output_file}")
 
     # Save shapefile data to CSV
     columns = ["Land Cover", "Number of Polygons", "Min Size", "Average Size (Hectares)", "Variance in Size (Hectares)"]
     df = pd.DataFrame(shapefile_data, columns=columns)
-    output_csv = os.path.join(output_folder, "stats_jessica4.csv")
+    output_csv = os.path.join(output_folder, "stats_jessica5.csv")
     df.to_csv(output_csv, index=False)
     print(f"Statistics saved to {output_csv}")
 
