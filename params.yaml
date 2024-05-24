@@ -1,0 +1,17 @@
+base:
+  random_state: 22
+
+io:
+  data_dir: '../data/costa_rica'
+  country: 'costa_rica'
+
+
+prepare_rasters:
+  ref_ds: 
+  country_shp: 'gadm41_CRI_0.shp'
+
+# prepare_polys:
+
+# prepare_points:
+
+

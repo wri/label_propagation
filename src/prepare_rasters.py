@@ -1,10 +1,20 @@
+#!/usr/bin/env python
+
 import os
 import rasterio as rs
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.warp import calculate_default_transform, reproject, Resampling
+from rasterio import Affine
 from glob import glob
 import geopandas as gpd
+import yaml
+import subprocess
+from osgeo import gdal
+from osgeo import osr
+from osgeo import ogr
+from osgeo import gdalconst
+
 
 def sentinel_merge_and_clip(country, data):
 
@@ -96,40 +106,115 @@ def reprj_lulc_raster(lulc_tif, dst_crs='EPSG:4326'):
                     resampling=Resampling.nearest)
     return None
 
+# def reprj_raster(src_ds = '../data/costa_rica/raw/lulc_cr_2016.tif', 
+#                  ref_ds = '../data/costa_rica/raw/CostaRica.tif',
+#                  dst_ds = '../data/interim/lulc_cr_reprj.tif',
+#                  crs='EPSG:4326'):
+
+#     '''
+#     Reproject the src_ds (LULC) to match the ref ds (TTC) projection and bounds
+#     Affine transform is not working
+#     '''
+#     ref_ds = gdal.Open(ref_ds, gdalconst.GA_ReadOnly)
+#     ref_geotrans = ref_ds.GetGeoTransform()
+#     width = ref_ds.RasterXSize 
+#     height = ref_ds.RasterYSize 
+
+#     with rs.open(src_ds) as src:
+#         assert src.crs != crs, print(f"source crs: {src.crs}, target crs: {crs}")
+#         kwargs = src.meta.copy()
+#         kwargs.update({
+#             'crs': crs,
+#             'transform': Affine(ref_geotrans),
+#             'width': width,
+#             'height': height,
+#             'compress': 'lzw',
+#             'dtype': 'uint8'})
+
+#         with rs.open(dst_ds, 'w', **kwargs) as dst:
+#             for i in range(1, src.count + 1):
+#                 reproject(
+#                     source=rs.band(src, i),
+#                     destination=rs.band(dst, i),
+#                     src_transform=src.transform,
+#                     src_crs=src.crs,
+#                     dst_transform=Affine(ref_geotrans),
+#                     dst_crs=crs,
+#                     resampling=Resampling.nearest)
+#     return None
 
 
 
+def rasterize_sdpt(src, 
+                    ref, 
+                    dst_path,
+                    attribute,
+                    no_data_value=255,
+                    rdtype=gdal.GDT_Float32, 
+                    **kwargs):
+    """
+    Converts any shapefile to a raster
+    :param in_shp_file_name: STR of a shapefile name (with directory e.g., "C:/temp/poly.shp")
+    :param out_raster_file_name: STR of target file name, including directory; must end on ".tif"
+    :param pixel_size: INT of pixel size (default: 10)
+    :param no_data_value: Numeric (INT/FLOAT) for no-data pixels (default: 255)
+    :param rdtype: gdal.GDALDataType raster data type - default=gdal.GDT_Float32 (32 bit floating point)
+    :kwarg field_name: name of the shapefile's field with values to burn to the raster
+    :return: produces the shapefile defined with in_shp_file_name
+
+    Applies gdal.RasterizeLayer with the following params:
+    options=["ALL_TOUCHED=TRUE"] defines that all pixels touched by a polygon get the polygon's field 
+    value - if not set: only pixels that are entirely in the polygon get a value assigned
+    burn_values=[0] (a default value that is burned to the raster)
+    
+    SDPT
+    2: 'forest plantation'
+    1: 'oil palm'
+    7215: 'orchard'
+    """
+    src_ds = ogr.Open(src)
+    src_lyr = src_ds.GetLayer()
+
+    # set up the reference file 
+    ref_ds = gdal.Open(ref, gdalconst.GA_ReadOnly)
+    ref_proj = ref_ds.GetProjection()
+    ref_geotrans = ref_ds.GetGeoTransform()
+    width = ref_ds.RasterXSize 
+    height = ref_ds.RasterYSize 
+    
+    # create destination data source (GeoTIff raster)
+    dst = gdal.GetDriverByName('GTiff').Create(dst_path, 
+                                                 width, 
+                                                 height, 
+                                                 1,
+                                                 eType=rdtype, 
+                                                 options=['COMPRESS=LZW'])
+    
+    dst.SetGeoTransform(ref_geotrans)
+    dst.SetProjection(ref_proj)
+    band = dst.GetRasterBand(1)
+    band.Fill(no_data_value)
+    band.SetNoDataValue(no_data_value)
+
+    gdal.RasterizeLayer(dst, 
+                        [1], 
+                        src_lyr, 
+                        None, 
+                        None, 
+                        options=["ALL_TOUCHED=TRUE", f"ATTRIBUTE={attribute}"]
+                       )
+
+    # release raster band
+    band.FlushCache()
+
+    return None
 
 
-
-
-# -*- coding: utf-8 -*-
-# import click
-# import logging
-# from pathlib import Path
-# from dotenv import find_dotenv, load_dotenv
-
-
-# @click.command()
-# @click.argument('input_filepath', type=click.Path(exists=True))
-# @click.argument('output_filepath', type=click.Path())
-# def main(input_filepath, output_filepath):
-#     """ Runs data processing scripts to turn raw data from (../raw) into
-#         cleaned data ready to be analyzed (saved in ../processed).
-#     """
-#     logger = logging.getLogger(__name__)
-#     logger.info('making final data set from raw data')
-
-
-# if __name__ == '__main__':
-#     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-#     # not used in this stub but often useful for finding various files
-#     project_dir = Path(__file__).resolve().parents[2]
-
-#     # find .env automagically by walking up directories until it's found, then
-#     # load up the .env entries as environment variables
-#     load_dotenv(find_dotenv())
-
-#     main()
+# this is the call for rasterize
+    # rasterize(src='../data/costa_rica/raw/cri_sdpt_v2.shp', 
+    #       ref='../data/costa_rica/raw/CostaRica.tif', 
+    #       dst_path='../data/costa_rica/interim/cri_sdpt_v2.tif',
+            # attribute='originalCo',
+    #       no_data_value=255,
+    #       rdtype=gdal.GDT_Float32
+    #      )
