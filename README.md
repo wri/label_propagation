@@ -4,7 +4,7 @@ Label Propagation for Transfer Learning
 Exploring a label propagation approach to gathering high quality training data.
 
 ## Workflow
-![workflow diagram](https://github.com/wri/label_propagation/blob/hc_polys/figures/workflow_diagram.png)
+![workflow diagram](https://github.com/wri/label_propagation/blob/main/figures/workflow_diagram.png)
 
 --------
 
